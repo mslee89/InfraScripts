@@ -1,5 +1,5 @@
 #!/bin/sh
-
+# CentOS 6 이하에서 알고리즘을 변경하기 위해 사용
 RESULT=`authconfig --test | grep algorithm | awk '{print $5}'`
 
 if [ RESULT == 'md5' ]; then
