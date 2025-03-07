@@ -11,5 +11,5 @@ elif [ "$RESULT" = "sha512" ]; then
     echo "$(hostname): No change needed - Current algorithm is $RESULT"
 else
     echo "$(hostname): Failed to detect password algorithm"
-    exit 1
+    exit 2
 fi
