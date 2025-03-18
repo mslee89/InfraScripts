@@ -1,0 +1,84 @@
+# 이 Playbook 은 External IP 가 없는 환경에서 node_exporter 를 배포 후 구동하기 위함입니다.
+# RUN_ONCE_SERVER 에 미리 패키지를 다운로드 해두어야 하며 RUN_ONCE_SERVER 에서 모든 노드에 배포 됩니다.
+---
+- name: Deploy node_exporter to all nodes
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    GIT_DEST_DIR: "/data/awx/monitoring"
+    RUN_ONCE_SERVER: "10.10.30.230"
+    NODE_EXPORTER_FILE: "node_exporter-1.9.0.linux-amd64.tar.gz"
+    TEMP_DIR: "/tmp"
+  tasks:
+    - name: Sync file from {{ RUN_ONCE_SERVER }}
+      synchronize:
+        src: "{{ GIT_DEST_DIR}}/{{ NODE_EXPORTER_FILE }}"
+        dest: "{{ TEMP_DIR }}/{{ NODE_EXPORTER_FILE }}"
+        mode: push
+      delegate_to: "{{ RUN_ONCE_SERVER }}"
+      
+    - name: Extract node_exporter
+      unarchive:
+        src: "{{ TEMP_DIR }}/node_exporter-1.9.0.linux-amd64.tar.gz"
+        dest: "{{ TEMP_DIR }}"
+        remote_src: yes
+
+    - name: Move node_exporter binary to /usr/local/bin
+      command: mv "{{ TEMP_DIR }}/node_exporter-1.9.0.linux-amd64/node_exporter /usr/local/bin/"
+      args:
+        creates: /usr/local/bin/node_exporter
+        
+    - name: Delete node_exporter tar.gz and extracted files
+      file:
+        path: "{{ TEMP_DIR }}/node_exporter-1.9.0.linux-amd64.tar.gz"
+        state: absent
+
+    - name: Delete extracted node_exporter directory
+      file:
+        path: "{{ TEMP_DIR }}/node_exporter-1.9.0.linux-amd64"
+        state: absent
+       
+    - name: Create systemd service file for node_exporter
+      copy:
+        dest: /etc/systemd/system/node-exporter.service
+        content: |
+          [Unit]
+          Description=Node Exporter
+          After=network.target
+
+          [Service]
+          User=nobody
+          ExecStart=/usr/local/bin/node_exporter --collector.softnet --collector.netstat --collector.bonding --collector.conntrack --collector.ethtool
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+
+    - name: Check if node_exporter is running
+      command: systemctl is-active node-exporter
+      register: node_exporter_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Start or restart node_exporter service
+      systemd:
+        name: node-exporter
+        enabled: yes
+        state: "{{ 'restarted' if node_exporter_check.stdout == 'active' else 'started' }}"
+
+    - name: Check node_exporter service status
+      command: systemctl status node-exporter
+      register: node_exporter_status
+      changed_when: false
+
+    - name: Display node_exporter status
+      debug:
+        msg: "{{ node_exporter_status.stdout_lines }}"
