@@ -1,0 +1,11 @@
+[Unit]
+Description=AutoHBaseRestart
+After=network.target
+
+[Service]
+User=nobody
+ExecStart=/bin/python3 /<Path>/AutoHBaseRestart.py 
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
