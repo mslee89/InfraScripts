@@ -19,7 +19,7 @@ logging.basicConfig(
 
 def get_all_slave_hosts():
     """
-    Ambari API를 통해 slave로 시작하는 모든 호스트 목록을 반환
+    Get all hosts whose name starts with 'slave' from Ambari API.
     """
     url = f"{AMBARI_SERVER}/api/v1/clusters/{CLUSTER_NAME}/hosts"
     try:
@@ -33,7 +33,7 @@ def get_all_slave_hosts():
 
 def get_regionserver_status(host):
     """
-    특정 호스트의 HBase RegionServer 상태를 반환
+    Get the HBase RegionServer status for a specific host.
     """
     url = f"{AMBARI_SERVER}/api/v1/clusters/{CLUSTER_NAME}/hosts/{host}/host_components/HBASE_REGIONSERVER"
     try:
@@ -48,7 +48,7 @@ def get_regionserver_status(host):
 
 def start_regionserver(host):
     """
-    특정 호스트의 HBase RegionServer를 시작
+    Start the HBase RegionServer on a specific host.
     """
     url = f"{AMBARI_SERVER}/api/v1/clusters/{CLUSTER_NAME}/hosts/{host}/host_components/HBASE_REGIONSERVER"
     headers = {
@@ -80,12 +80,12 @@ def start_regionserver(host):
 
 def monitor_regionserver():
     """
-    모든 slave 호스트의 RegionServer 상태를 주기적으로 점검하고, 비정상 시 재시작
+    Periodically check the RegionServer status on all slave hosts and restart if not running.
     """
     while True:
         hosts = get_all_slave_hosts()
         if not hosts:
-            logging.warning("[monitor_regionserver] No slave hosts found. 재시도 대기...")
+            logging.warning("[monitor_regionserver] No slave hosts found. Retrying after interval...")
             time.sleep(CHECK_INTERVAL)
             continue
         for host in hosts:
@@ -95,14 +95,14 @@ def monitor_regionserver():
             elif status == "NOT_FOUND":
                 logging.warning(f"[monitor_regionserver] {host}: RegionServer component NOT FOUND.")
             elif status == "ERROR":
-                logging.error(f"[monitor_regionserver] {host}: 상태 조회 실패.")
+                logging.error(f"[monitor_regionserver] {host}: Failed to get status.")
             else:
                 logging.warning(f"[monitor_regionserver] {host}: RegionServer is {status}. Restarting...")
                 start_regionserver(host)
         time.sleep(CHECK_INTERVAL)
 
 def main():
-    logging.info("[main] Auto HBase RegionServer Monitor 시작")
+    logging.info("[main] Auto HBase RegionServer Monitor started.")
     monitor_regionserver()
 
 if __name__ == "__main__":
